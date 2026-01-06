@@ -177,14 +177,19 @@ def vector_embedding(pdf_files):
             
             # Split documents into chunks
             st.session_state.text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000,
-                chunk_overlap=200
+                chunk_size=500,
+                chunk_overlap=100
             )
             st.session_state.final_documents = (
                 st.session_state.text_splitter.split_documents(
                     st.session_state.docs
                 )
             )
+            
+            # Validate chunks were created
+            if not st.session_state.final_documents:
+                st.warning("⚠️ PDF content is too small to split into chunks. Using original documents...")
+                st.session_state.final_documents = st.session_state.docs
             
             st.success(
                 f"✅ Split into {len(st.session_state.final_documents)} chunks"
