@@ -82,7 +82,7 @@ def load_llm():
     """Initialize and cache the Groq LLM model."""
     return ChatGroq(
         api_key=groq_api_key,
-        model_name="Gemma-7b-it",
+        model_name="mixtral-8x7b-32768",
         temperature=0.7
     )
 
