@@ -6,6 +6,6 @@ pypdf==4.0.2
 faiss-cpu==1.13.2
 streamlit==1.28.0
 python-dotenv==1.0.0
-huggingface-hub==0.19.4
+huggingface-hub>=0.23.0
 sentence-transformers==3.0.1
 transformers>=4.41.0
