@@ -1,10 +1,10 @@
 groq==0.15.0
-langchain-groq==0.2.0
+langchain-groq==0.1.15
 PyPDF2==3.0.1
-langchain==0.3.0
-langchain-community==0.3.0
-langchain-text-splitters==0.3.0
-langchain-core==0.3.0
+langchain==0.1.20
+langchain-community==0.0.38
+langchain-text-splitters==0.0.2
+langchain-core==0.1.52
 langchain-google-genai==0.0.11
 streamlit==1.28.0
 python-dotenv==1.0.0
