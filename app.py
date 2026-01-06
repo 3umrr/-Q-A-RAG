@@ -27,11 +27,13 @@ from langchain_groq import ChatGroq
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.vectorstores import FAISS
-from langchain_community.document_loaders import PyPDFDirectoryLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain_google_genai.embeddings import GoogleGenerativeAIEmbeddings
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
+from io import BytesIO
+import tempfile
 
 
 # ============================================================================
@@ -127,92 +129,105 @@ qa_prompt = ChatPromptTemplate.from_template(
 # VECTOR STORE FUNCTIONS
 # ============================================================================
 
-def vector_embedding():
+def vector_embedding(pdf_files):
     """
-    Create vector store from PDFs in ./us_census directory.
-    Stores result in st.session_state for reuse across interactions.
-    """
-    if "vectors" not in st.session_state:
-        try:
-            with st.spinner("📥 Loading and processing PDFs..."):
-                # Initialize embeddings
-                st.session_state.embeddings = GoogleGenerativeAIEmbeddings(
-                    model="models/embedding-001"
-                )
-                
-                # Load PDFs from directory
-                st.session_state.loader = PyPDFDirectoryLoader("./us_census")
-                st.session_state.docs = st.session_state.loader.load()
-                
-                # Validate documents were loaded
-                if not st.session_state.docs:
-                    st.error("❌ No PDFs found in ./us_census folder")
-                    return False
-                
-                st.success(f"✅ Loaded {len(st.session_state.docs)} PDF(s)")
-                
-                # Split documents into chunks
-                st.session_state.text_splitter = RecursiveCharacterTextSplitter(
-                    chunk_size=1000,
-                    chunk_overlap=200
-                )
-                st.session_state.final_documents = (
-                    st.session_state.text_splitter.split_documents(
-                        st.session_state.docs
-                    )
-                )
-                
-                st.success(
-                    f"✅ Split into {len(st.session_state.final_documents)} chunks"
-                )
-                
-                # Create vector store
-                st.session_state.vectors = FAISS.from_documents(
-                    st.session_state.final_documents,
-                    st.session_state.embeddings
-                )
-                
-                return True
-        except Exception as e:
-            st.error(f"❌ Error creating vector store: {str(e)}")
-            return False
+    Create vector store from uploaded PDF files.
     
-    return True
+    Args:
+        pdf_files: List of uploaded PDF file objects from Streamlit
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    if not pdf_files:
+        st.error("❌ No PDF files provided")
+        return False
+    
+    try:
+        with st.spinner("📥 Loading and processing PDFs..."):
+            # Initialize embeddings
+            st.session_state.embeddings = GoogleGenerativeAIEmbeddings(
+                model="models/embedding-001"
+            )
+            
+            # Load PDFs from uploaded files
+            st.session_state.docs = []
+            
+            for pdf_file in pdf_files:
+                # Create temporary file from uploaded bytes
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                    tmp_file.write(pdf_file.read())
+                    tmp_path = tmp_file.name
+                
+                try:
+                    # Load PDF using PyPDFLoader
+                    loader = PyPDFLoader(tmp_path)
+                    docs = loader.load()
+                    st.session_state.docs.extend(docs)
+                finally:
+                    # Clean up temporary file
+                    os.unlink(tmp_path)
+            
+            # Validate documents were loaded
+            if not st.session_state.docs:
+                st.error("❌ No content found in the uploaded PDFs")
+                return False
+            
+            st.success(f"✅ Loaded {len(st.session_state.docs)} pages from PDF(s)")
+            
+            # Split documents into chunks
+            st.session_state.text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=1000,
+                chunk_overlap=200
+            )
+            st.session_state.final_documents = (
+                st.session_state.text_splitter.split_documents(
+                    st.session_state.docs
+                )
+            )
+            
+            st.success(
+                f"✅ Split into {len(st.session_state.final_documents)} chunks"
+            )
+            
+            # Create vector store
+            st.session_state.vectors = FAISS.from_documents(
+                st.session_state.final_documents,
+                st.session_state.embeddings
+            )
+            
+            st.session_state.pdf_uploaded = True
+            return True
+    except Exception as e:
+        st.error(f"❌ Error creating vector store: {str(e)}")
+        return False
 
 
 # ============================================================================
-# SIDEBAR - SETTINGS
+# SIDEBAR - PDF UPLOAD
 # ============================================================================
 
 with st.sidebar:
-    st.header("⚙️ Settings")
+    st.header("📁 Upload PDFs")
     
-    st.subheader("📁 Document Management")
-    if st.button("🔄 Create/Refresh Vector Store from PDFs"):
-        # Clear existing vectors to force reload
-        if "vectors" in st.session_state:
-            del st.session_state.vectors
-        
-        success = vector_embedding()
-        if success:
-            st.success("✅ Vector store created successfully!")
-    
-    st.divider()
-    
-    st.subheader("ℹ️ About")
-    st.markdown(
-        """
-        **Model:** Gemma-7b-it  
-        **Provider:** Groq  
-        **Temperature:** 0.7
-        
-        **Technologies:**
-        - Groq LLM for fast inference
-        - FAISS for vector search
-        - Streamlit for web UI
-        - LangChain for orchestration
-        """
+    uploaded_files = st.file_uploader(
+        "Select PDF files to analyze",
+        type=["pdf"],
+        accept_multiple_files=True,
+        help="Upload one or more PDF files to create a searchable document database"
     )
+    
+    if uploaded_files:
+        if st.button("🚀 Process PDFs", key="process_pdfs"):
+            # Clear existing vectors to force reload
+            if "vectors" in st.session_state:
+                del st.session_state.vectors
+            
+            success = vector_embedding(uploaded_files)
+            if success:
+                st.success("✅ PDFs processed and ready for Q&A!")
+    else:
+        st.info("👆 Upload PDF files to get started")
 
 
 # ============================================================================
@@ -225,8 +240,8 @@ st.header("💬 Ask Questions About Your Documents")
 if "vectors" not in st.session_state:
     st.info(
         "📌 **Get Started:**\n\n"
-        "1. Place your PDF files in the `./us_census` folder\n"
-        "2. Click 'Create/Refresh Vector Store' in the sidebar\n"
+        "1. Upload your PDF files using the uploader in the sidebar\n"
+        "2. Click 'Process PDFs'\n"
         "3. Then ask your questions here!"
     )
 else:
@@ -244,8 +259,8 @@ user_question = st.text_input(
 if user_question:
     if "vectors" not in st.session_state:
         st.warning(
-            "⚠️ Please create the vector store first by clicking "
-            "'Create/Refresh Vector Store' in the sidebar."
+            "⚠️ Please upload and process PDFs first using the "
+            "file uploader in the sidebar."
         )
     else:
         try:
