@@ -7,13 +7,12 @@ This application allows users to:
 3. Get AI-powered answers using Groq's Gemma model
 
 Requirements:
-- Groq API Key (GROQ_API_KEY)
-- Google API Key (GOOGLE_API_KEY)
+- Groq API Key (GROQ_API_KEY) - Free from https://console.groq.com
+- Hugging Face Embeddings (Free, no API key needed, runs locally)
 
 Environment Setup:
 Create a .env file with:
     GROQ_API_KEY=your_groq_api_key
-    GOOGLE_API_KEY=your_google_api_key
 """
 
 # ============================================================================
@@ -28,7 +27,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_google_genai.embeddings import GoogleGenerativeAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
@@ -45,11 +44,6 @@ load_dotenv()
 
 # Get API keys from environment variables
 groq_api_key = os.getenv("GROQ_API_KEY")
-google_api_key = os.getenv("GOOGLE_API_KEY")
-
-# Set Google API key in environment
-if google_api_key:
-    os.environ["GOOGLE_API_KEY"] = google_api_key
 
 # Configure Streamlit page
 st.set_page_config(
@@ -71,14 +65,6 @@ def validate_api_keys():
             "❌ **GROQ_API_KEY not found!**\n\n"
             "Please add your Groq API key to the `.env` file:\n"
             "`GROQ_API_KEY=your_key_here`"
-        )
-        st.stop()
-    
-    if not google_api_key:
-        st.error(
-            "❌ **GOOGLE_API_KEY not found!**\n\n"
-            "Please add your Google API key to the `.env` file:\n"
-            "`GOOGLE_API_KEY=your_key_here`"
         )
         st.stop()
 
@@ -145,9 +131,9 @@ def vector_embedding(pdf_files):
     
     try:
         with st.spinner("📥 Loading and processing PDFs..."):
-            # Initialize embeddings
-            st.session_state.embeddings = GoogleGenerativeAIEmbeddings(
-                model="models/embedding-001"
+            # Initialize embeddings using Hugging Face (free, no API key needed)
+            st.session_state.embeddings = HuggingFaceEmbeddings(
+                model_name="all-MiniLM-L6-v2"
             )
             
             # Load PDFs from uploaded files
