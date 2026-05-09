@@ -10,13 +10,22 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
-from io import BytesIO
 import tempfile
 
 
-load_dotenv()
+# Load .env from the script directory
+env_path = os.path.join(os.path.dirname(__file__), ".env")
+print(f"Loading .env from: {env_path}")
+print(f".env exists: {os.path.exists(env_path)}")
+
+load_dotenv(dotenv_path=env_path, override=True)
 
 groq_api_key = os.getenv("GROQ_API_KEY")
+print(f"GROQ_API_KEY loaded: {bool(groq_api_key)}")
+if groq_api_key:
+    print(f"API Key first 10 chars: {groq_api_key[:10]}...")
+else:
+    print("ERROR: GROQ_API_KEY is None/empty!")
 
 st.set_page_config(
     page_title="📄 Q&A with PDFs",
@@ -48,7 +57,15 @@ def load_llm():
     )
 
 
+@st.cache_resource
+def load_embeddings():
+    return HuggingFaceEmbeddings(
+        model_name="all-MiniLM-L6-v2"
+    )
+
+
 llm = load_llm()
+embeddings = load_embeddings()
 
 st.title("📄 Q&A with your PDFs")
 st.markdown("Ask questions about your PDF documents and get AI-powered answers")
@@ -73,10 +90,6 @@ def vector_embedding(pdf_files):
     
     try:
         with st.spinner("📥 Loading and processing PDFs..."):
-            st.session_state.embeddings = HuggingFaceEmbeddings(
-                model_name="all-MiniLM-L6-v2"
-            )
-            
             st.session_state.docs = []
             
             for pdf_file in pdf_files:
@@ -117,7 +130,7 @@ def vector_embedding(pdf_files):
             
             st.session_state.vectors = FAISS.from_documents(
                 st.session_state.final_documents,
-                st.session_state.embeddings
+                embeddings
             )
             
             st.session_state.pdf_uploaded = True
@@ -195,6 +208,9 @@ if user_question:
                     | StrOutputParser()
                 )
                 
+                # Get retrieved documents for display
+                retrieved_docs = retriever.invoke(user_question)
+                
                 start_time = time.time()
                 
                 response = rag_chain.invoke(user_question)
@@ -205,11 +221,20 @@ if user_question:
             st.markdown(response)
             
             st.divider()
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             with col1:
                 st.caption(f"⏱️ Response time: {elapsed_time:.2f} seconds")
             with col2:
                 st.caption(f"📝 Response length: {len(response)} characters")
+            with col3:
+                st.caption(f"📖 Documents retrieved: {len(retrieved_docs)}")
+            
+            # Show retrieved context
+            with st.expander("📄 View Retrieved Context"):
+                for i, doc in enumerate(retrieved_docs, 1):
+                    st.write(f"**Chunk {i}:**")
+                    st.write(doc.page_content)
+                    st.divider()
         
         except Exception as error:
             st.error(f"❌ Error processing question: {str(error)}")
