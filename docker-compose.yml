@@ -17,7 +17,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
     ports:
-      - "5432:5432"
+      - "5433:5432"
 
    
     healthcheck:
@@ -41,10 +41,9 @@ services:
 
     environment:
      
-      GROQ_API_KEY: ${GROQ_API_KEY}
-
-
-      DATABASE_URL: postgresql://postgres:1234@postgres:5432/rag_db
+      GROQ_API_KEY:  ${GROQ_API_KEY}
+      DATABASE_URL:  postgresql://postgres:1234@postgres:5432/rag_db
+      SECRET_KEY:    ${SECRET_KEY}
 
   
     depends_on:
